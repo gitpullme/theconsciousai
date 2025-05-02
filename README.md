@@ -1,36 +1,115 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Medical Queue AI
 
-## Getting Started
+An AI-powered medical queue management system that uses Google's Gemini AI to analyze medical receipts and prioritize patients based on the severity of their condition.
 
-First, run the development server:
+## Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- **User Authentication**: Login with Google account
+- **Upload Medical Receipts**: Patients can upload their medical receipts
+- **AI Analysis**: Google Gemini AI analyzes patient's conditions from medical receipts
+- **Priority Queue**: Patients are queued based on the severity of their condition
+- **Hospital Selection**: Patients can select their preferred hospital
+- **Hospital Dashboard**: Hospitals can view and manage their patient queue
+- **Admin Dashboard**: Administrators can manage hospitals and users
+
+## Tech Stack
+
+- **Frontend**: Next.js, React, TailwindCSS
+- **Backend**: Next.js API Routes
+- **Database**: PostgreSQL (NeonDB)
+- **Authentication**: NextAuth.js with Google provider
+- **ORM**: Prisma
+- **AI**: Google Gemini API
+
+## Setup Instructions
+
+### Prerequisites
+
+- Node.js (v18 or later)
+- NPM or Yarn
+- NeonDB PostgreSQL database or other PostgreSQL database
+- Google OAuth credentials
+- Google Gemini API key
+
+### Environment Variables
+
+Create a `.env.local` file in the root directory with the following variables:
+
+```
+DATABASE_URL="your-postgresql-connection-string"
+GOOGLE_CLIENT_ID="your-google-client-id"
+GOOGLE_CLIENT_SECRET="your-google-client-secret"
+NEXTAUTH_SECRET="random-secret-string-for-jwt"
+NEXTAUTH_URL="http://localhost:3000"
+GEMINI_API_KEY="your-gemini-api-key"
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Installation
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. Clone the repository:
+   ```
+   git clone <repository-url>
+   cd medical-queue-ai
+   ```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+2. Install dependencies:
+   ```
+   npm install
+   ```
 
-## Learn More
+3. Set up the database schema:
+   ```
+   npx prisma migrate dev
+   ```
 
-To learn more about Next.js, take a look at the following resources:
+4. Generate Prisma Client:
+   ```
+   npx prisma generate
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+5. Start the development server:
+   ```
+   npm run dev
+   ```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+6. Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-## Deploy on Vercel
+## Usage
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Patient Flow
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Login with Google account
+2. Select state and hospital
+3. Upload medical receipt
+4. View queue position and receipt analysis
+
+### Hospital Flow
+
+1. Login with hospital admin account
+2. View patient queue
+3. Process patients and update queue status
+
+### Admin Flow
+
+1. Login with admin account
+2. View system statistics
+3. Manage hospitals and users
+
+## API Endpoints
+
+- `/api/auth/*` - Authentication endpoints
+- `/api/states` - Get list of Indian states
+- `/api/hospitals` - Get hospitals by state
+- `/api/receipts/upload` - Upload and process a medical receipt
+- `/api/receipts/[id]` - Get receipt details
+- `/api/receipts/[id]/complete` - Mark a receipt as completed
+- `/api/hospital/queue` - Get the hospital's patient queue
+- `/api/admin/stats` - Get system statistics
+
+## Contributing
+
+Contributions are welcome! Feel free to submit a Pull Request.
+
+## License
+
+This project is licensed under the MIT License.
