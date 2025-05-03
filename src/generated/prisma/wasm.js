@@ -205,7 +205,7 @@ const config = {
       "value": "prisma-client-js"
     },
     "output": {
-      "value": "C:\\projects\\medical-queue-ai\\src\\generated\\prisma",
+      "value": "C:\\notepad folder\\medical-queue-ai\\src\\generated\\prisma",
       "fromEnvVar": null
     },
     "config": {
@@ -221,7 +221,7 @@ const config = {
     "previewFeatures": [
       "driverAdapters"
     ],
-    "sourceFilePath": "C:\\projects\\medical-queue-ai\\prisma\\schema.prisma",
+    "sourceFilePath": "C:\\notepad folder\\medical-queue-ai\\prisma\\schema.prisma",
     "isCustomOutput": true
   },
   "relativeEnvPaths": {
@@ -235,11 +235,12 @@ const config = {
     "db"
   ],
   "activeProvider": "postgresql",
+  "postinstall": false,
   "inlineDatasources": {
     "db": {
       "url": {
         "fromEnvVar": "DATABASE_URL",
-        "value": "postgresql://neondb_owner:npg_pdjTalF2WM8A@ep-royal-math-a5j7gwws.us-east-2.aws.neon.tech/neondb?sslmode=require"
+        "value": null
       }
     }
   },

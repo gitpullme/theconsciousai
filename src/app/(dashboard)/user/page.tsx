@@ -36,6 +36,7 @@ export default function UserDashboard() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [receipts, setReceipts] = useState<Receipt[]>([]);
   const [isLoadingReceipts, setIsLoadingReceipts] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
 
   // If not authenticated, redirect to login
   if (status === "unauthenticated") {
@@ -89,54 +90,90 @@ export default function UserDashboard() {
     setIsUploading(true);
     setError(null);
     setSuccessMessage(null);
+    setUploadStatus("Preparing your receipt...");
 
     if (!selectedHospital) {
       setError("Please select a hospital");
       setIsUploading(false);
+      setUploadStatus(null);
       return;
     }
 
     if (!uploadedFile) {
       setError("Please upload a medical receipt");
       setIsUploading(false);
+      setUploadStatus(null);
       return;
     }
 
     try {
-      const formData = new FormData();
-      formData.append("receipt", uploadedFile);
-      formData.append("hospitalId", selectedHospital.id);
+      // Convert file to base64
+      setUploadStatus("Reading file...");
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        if (!event.target || !event.target.result) {
+          throw new Error("Failed to read file");
+        }
+        
+        const base64String = event.target.result as string;
+        const base64Data = base64String.split(",")[1]; // Remove data URL prefix
+        
+        setUploadStatus("Sending to AI for analysis...");
+        
+        const response = await fetch("/api/receipts/upload", {
+          method: "POST",
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            image: base64Data,
+            hospitalId: selectedHospital.id
+          }),
+        });
 
-      const response = await fetch("/api/receipts/upload", {
-        method: "POST",
-        body: formData,
-      });
+        if (!response.ok) {
+          const errorData = await response.json();
+          setError(errorData.error || "Failed to upload receipt");
+          setIsUploading(false);
+          setUploadStatus(null);
+          return;
+        }
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to upload receipt");
-      }
-
-      const data = await response.json();
-      setSuccessMessage("Receipt uploaded successfully! Our AI is analyzing your receipt to determine queue position.");
-      setUploadedFile(null);
+        setUploadStatus("Finalizing analysis...");
+        const data = await response.json();
+        
+        setUploadStatus("Complete!");
+        setSuccessMessage(`Receipt successfully analyzed! You are number ${data.queuePosition} in the queue with severity rating: ${data.severity || 'N/A'}.`);
+        setUploadedFile(null);
+        
+        // Reset the file input
+        const fileInput = document.getElementById("receipt") as HTMLInputElement;
+        if (fileInput) {
+          fileInput.value = "";
+        }
+        
+        // Refresh receipts after upload
+        if (session?.user?.id) {
+          const userReceipts = await getUserReceipts(session.user.id);
+          setReceipts(userReceipts);
+        }
+        setIsUploading(false);
+      };
       
-      // Reset the file input
-      const fileInput = document.getElementById("receipt") as HTMLInputElement;
-      if (fileInput) {
-        fileInput.value = "";
-      }
+      reader.onerror = () => {
+        setError("Failed to read file");
+        setIsUploading(false);
+        setUploadStatus(null);
+      };
       
-      // Refresh receipts after upload
-      if (session?.user?.id) {
-        const userReceipts = await getUserReceipts(session.user.id);
-        setReceipts(userReceipts);
-      }
+      // Start reading the file
+      reader.readAsDataURL(uploadedFile);
+      
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred during upload");
       console.error("Upload error:", err);
-    } finally {
       setIsUploading(false);
+      setUploadStatus(null);
     }
   };
 
@@ -385,12 +422,18 @@ export default function UserDashboard() {
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                    Uploading...
+                    {uploadStatus || "Processing..."}
                   </span>
                 ) : (
                   "Upload Receipt"
                 )}
               </button>
+              
+              {isUploading && (
+                <p className="mt-2 text-xs text-gray-500 text-center">
+                  Please wait while we upload and analyze your medical receipt. This may take a few moments.
+                </p>
+              )}
             </div>
           </form>
         </div>

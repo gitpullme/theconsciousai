@@ -12,6 +12,13 @@ export default function UploadReceipt() {
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<string>("");
+  const [uploadSuccess, setUploadSuccess] = useState<boolean>(false);
+  const [uploadResult, setUploadResult] = useState<{
+    queuePosition?: number;
+    hospitalName?: string;
+    severity?: number;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedState, setSelectedState] = useState<string>("");
   const [selectedHospital, setSelectedHospital] = useState<string>("");
@@ -25,7 +32,9 @@ export default function UploadReceipt() {
         const response = await fetch('/api/states');
         if (response.ok) {
           const data = await response.json();
-          setStates(data);
+          // Handle both array response and object with states property
+          const statesData = Array.isArray(data) ? data : (data.states || []);
+          setStates(statesData);
           
           // If user has a state set in their profile, select it by default
           if (session?.user?.state) {
@@ -35,6 +44,7 @@ export default function UploadReceipt() {
         }
       } catch (error) {
         console.error("Failed to fetch states:", error);
+        setStates([]); // Set empty array on error to prevent mapping issues
       }
     }
     
@@ -49,10 +59,12 @@ export default function UploadReceipt() {
       const response = await fetch(`/api/hospitals?state=${encodeURIComponent(state)}`);
       if (response.ok) {
         const data = await response.json();
-        setHospitals(data);
+        // Extract hospitals from the response
+        setHospitals(data.hospitals || []);
       }
     } catch (error) {
       console.error("Failed to fetch hospitals:", error);
+      setHospitals([]); // Set empty array on error to prevent mapping issues
     }
   }
 
@@ -104,6 +116,9 @@ export default function UploadReceipt() {
     
     setIsUploading(true);
     setError(null);
+    setUploadStatus("Preparing image...");
+    setUploadSuccess(false);
+    setUploadResult(null);
     
     try {
       // Convert file to base64
@@ -111,6 +126,8 @@ export default function UploadReceipt() {
       reader.onloadend = async () => {
         const base64String = reader.result as string;
         const base64Data = base64String.split(",")[1]; // Remove data URL prefix
+        
+        setUploadStatus("Uploading medical report...");
         
         // Send to API
         const response = await fetch('/api/receipts/upload', {
@@ -125,10 +142,19 @@ export default function UploadReceipt() {
         });
         
         if (response.ok) {
-          router.push('/user');
+          const result = await response.json();
+          setUploadStatus("Analysis complete!");
+          setUploadSuccess(true);
+          setUploadResult(result);
+          
+          // Wait 3 seconds before redirecting to show the success message
+          setTimeout(() => {
+            router.push('/user');
+          }, 3000);
         } else {
           const data = await response.json();
           setError(data.error || "Failed to upload receipt");
+          setUploadStatus("");
         }
       };
       
@@ -136,6 +162,7 @@ export default function UploadReceipt() {
     } catch (error) {
       console.error("Error uploading receipt:", error);
       setError("Failed to upload receipt");
+      setUploadStatus("");
     } finally {
       setIsUploading(false);
     }
@@ -335,7 +362,7 @@ export default function UploadReceipt() {
                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                   ></path>
                 </svg>
-                Processing...
+                {uploadStatus || "Processing..."}
               </>
             ) : (
               "Upload and Process"
@@ -343,6 +370,39 @@ export default function UploadReceipt() {
           </button>
         </div>
       </form>
+      
+      {uploadSuccess && uploadResult && (
+        <div className="mt-6 bg-green-50 border-l-4 border-green-400 p-4 rounded-md">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg 
+                className="h-5 w-5 text-green-400" 
+                viewBox="0 0 20 20" 
+                fill="currentColor"
+              >
+                <path 
+                  fillRule="evenodd" 
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" 
+                  clipRule="evenodd" 
+                />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-green-800">Analysis Complete</h3>
+              <div className="mt-2 text-sm text-green-700">
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>Hospital: {uploadResult.hospitalName}</li>
+                  <li>Queue Position: #{uploadResult.queuePosition}</li>
+                  {uploadResult.severity !== undefined && (
+                    <li>Severity Rating: {uploadResult.severity}/10</li>
+                  )}
+                </ul>
+                <p className="mt-2">Redirecting to your dashboard...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 

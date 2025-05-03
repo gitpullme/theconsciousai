@@ -11,9 +11,12 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { image, hospitalId } = await request.json();
+    console.log("Receipt upload request received");
+    const body = await request.json();
+    const { image, hospitalId } = body;
 
     if (!image) {
+      console.log("Missing image in upload request");
       return NextResponse.json(
         { error: "Medical receipt image is required" },
         { status: 400 }
@@ -21,16 +24,27 @@ export async function POST(request: Request) {
     }
 
     if (!hospitalId) {
+      console.log("Missing hospitalId in upload request");
       return NextResponse.json(
         { error: "Hospital ID is required" },
         { status: 400 }
       );
     }
 
+    console.log(`Processing receipt for user ${session.user.id} to hospital ${hospitalId}`);
+    
     // Upload and process the receipt
     const receipt = await uploadReceipt(session.user.id, image, hospitalId);
+    console.log(`Receipt processed successfully: ${receipt.id}, position: ${receipt.queuePosition}`);
 
-    return NextResponse.json(receipt);
+    return NextResponse.json({
+      id: receipt.id,
+      status: receipt.status,
+      queuePosition: receipt.queuePosition,
+      hospitalName: receipt.hospital?.name,
+      severity: receipt.severity,
+      processedAt: receipt.processedAt
+    });
   } catch (error) {
     console.error("Error processing receipt:", error);
     return NextResponse.json(

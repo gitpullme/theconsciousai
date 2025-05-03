@@ -17,6 +17,8 @@ type QueueItem = {
   condition?: string;
   severity?: number;
   uploatedAt: string;
+  aiAnalysis?: string;
+  status: string;
 };
 
 export default function HospitalDashboard() {
@@ -25,6 +27,7 @@ export default function HospitalDashboard() {
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [expandedReceipt, setExpandedReceipt] = useState<string | null>(null);
 
   useEffect(() => {
     if (status === "authenticated") {
@@ -70,6 +73,48 @@ export default function HospitalDashboard() {
       console.error("Error completing receipt:", error);
       setError("Failed to complete this patient's visit");
     }
+  }
+
+  function toggleExpandReceipt(receiptId: string) {
+    if (expandedReceipt === receiptId) {
+      setExpandedReceipt(null);
+    } else {
+      setExpandedReceipt(receiptId);
+    }
+  }
+
+  // Helper function to format AI analysis for display
+  function formatAiAnalysis(analysis: string) {
+    if (!analysis) return null;
+    
+    // Split by headings and wrap in proper HTML
+    return analysis
+      .split(/\d+\./).map((section, index) => {
+        if (index === 0 && !section.trim()) return null;
+        
+        const lines = section.trim().split('\n');
+        const heading = lines[0].trim();
+        const content = lines.slice(1).join('\n').trim();
+        
+        if (!heading) return null;
+        
+        return (
+          <div key={index} className="mb-2">
+            <p className="font-semibold text-gray-700">{heading}</p>
+            <p className="text-sm text-gray-600">{content}</p>
+          </div>
+        );
+      })
+      .filter(Boolean);
+  }
+
+  // Function to determine priority badge color
+  function getPriorityBadgeColor(severity: number | undefined) {
+    if (!severity) return "bg-gray-100 text-gray-800";
+    if (severity >= 8) return "bg-red-100 text-red-800";
+    if (severity >= 6) return "bg-orange-100 text-orange-800";
+    if (severity >= 4) return "bg-yellow-100 text-yellow-800";
+    return "bg-green-100 text-green-800";
   }
 
   if (loading) {
@@ -162,16 +207,18 @@ export default function HospitalDashboard() {
                     {item.severity !== null && (
                       <span
                         className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium mr-3 ${
-                          item.severity && item.severity > 7
-                            ? "bg-red-100 text-red-800"
-                            : item.severity && item.severity > 4
-                            ? "bg-yellow-100 text-yellow-800"
-                            : "bg-green-100 text-green-800"
+                          getPriorityBadgeColor(item.severity)
                         }`}
                       >
-                        Severity: {item.severity}
+                        Severity: {item.severity}/10
                       </span>
                     )}
+                    <button
+                      onClick={() => toggleExpandReceipt(item.id)}
+                      className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium leading-4 text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 mr-2"
+                    >
+                      {expandedReceipt === item.id ? "Hide Details" : "View Details"}
+                    </button>
                     <button
                       onClick={() => handleCompleteReceipt(item.id)}
                       className="inline-flex items-center rounded-md border border-transparent bg-indigo-600 px-3 py-2 text-sm font-medium leading-4 text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
@@ -180,13 +227,22 @@ export default function HospitalDashboard() {
                     </button>
                   </div>
                 </div>
-                {item.condition && (
-                  <div className="mt-2 ml-14">
-                    <p className="text-sm text-gray-500 line-clamp-2">
-                      <span className="font-medium">Condition:</span> {item.condition}
-                    </p>
+                
+                {expandedReceipt === item.id && (
+                  <div className="mt-4 ml-14 bg-gray-50 p-4 rounded-md">
+                    <h4 className="font-medium text-gray-900 mb-2">AI Analysis</h4>
+                    <div className="text-sm">
+                      {item.aiAnalysis ? (
+                        <div className="space-y-2">
+                          {formatAiAnalysis(item.aiAnalysis)}
+                        </div>
+                      ) : (
+                        <p className="text-gray-500">No analysis available</p>
+                      )}
+                    </div>
                   </div>
                 )}
+                
                 <div className="mt-1 ml-14">
                   <p className="text-xs text-gray-400">
                     Uploaded {new Date(item.uploatedAt).toLocaleString()}
