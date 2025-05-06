@@ -1,0 +1,740 @@
+"use client";
+
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import Image from "next/image";
+
+type QueueItem = {
+  id: string;
+  queuePosition: number;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    image: string | null;
+  };
+  condition?: string;
+  severity?: number;
+  uploatedAt: string;
+  aiAnalysis?: string;
+  status: string;
+  doctor?: {
+    id: string;
+    name: string;
+    specialty: string;
+  } | null;
+};
+
+type Doctor = {
+  id: string;
+  name: string;
+  specialty: string;
+  available: boolean;
+  patientCount: number;
+};
+
+// Skeleton loading components for better UX
+const QueueSkeleton = () => (
+  <div className="overflow-hidden bg-white shadow sm:rounded-md animate-pulse">
+    <ul role="list" className="divide-y divide-gray-200">
+      {[...Array(4)].map((_, i) => (
+        <li key={i} className="px-0 py-4 sm:px-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <div className="h-10 w-10 rounded-full bg-gray-200"></div>
+              <div className="ml-4">
+                <div className="h-4 w-40 bg-gray-200 rounded mb-2"></div>
+                <div className="h-3 w-32 bg-gray-200 rounded"></div>
+              </div>
+            </div>
+            <div className="flex space-x-2">
+              <div className="h-8 w-20 bg-gray-200 rounded"></div>
+              <div className="h-8 w-28 bg-gray-200 rounded"></div>
+            </div>
+          </div>
+        </li>
+      ))}
+    </ul>
+  </div>
+);
+
+const DoctorsSkeleton = () => (
+  <div className="overflow-hidden bg-white shadow sm:rounded-md animate-pulse">
+    <div className="px-4 py-5 sm:px-6 bg-gray-50">
+      <div className="h-5 w-32 bg-gray-200 rounded mb-2"></div>
+      <div className="h-4 w-60 bg-gray-200 rounded"></div>
+    </div>
+    <ul role="list" className="divide-y divide-gray-200">
+      {[...Array(3)].map((_, i) => (
+        <li key={i} className="px-4 py-4 sm:px-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="h-5 w-40 bg-gray-200 rounded mb-2"></div>
+              <div className="flex space-x-2 mt-1">
+                <div className="h-4 w-20 bg-gray-200 rounded"></div>
+                <div className="h-4 w-20 bg-gray-200 rounded"></div>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="h-4 w-24 bg-gray-200 rounded mb-1"></div>
+              <div className="h-6 w-8 bg-gray-200 rounded ml-auto"></div>
+            </div>
+          </div>
+        </li>
+      ))}
+    </ul>
+  </div>
+);
+
+export default function HospitalDashboard() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+  const [queue, setQueue] = useState<QueueItem[]>([]);
+  const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [loadingQueue, setLoadingQueue] = useState(true);
+  const [loadingDoctors, setLoadingDoctors] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [expandedReport, setExpandedReport] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'queue' | 'doctors'>('queue');
+  const [lastFetched, setLastFetched] = useState<number>(0);
+  const [isRefreshThrottled, setIsRefreshThrottled] = useState(false);
+  const [processingReport, setProcessingReport] = useState<string | null>(null);
+  
+  // Use refs instead of state for interval to avoid re-renders
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isMountedRef = useRef<boolean>(true);
+  const lastFetchedRef = useRef<number>(0);
+  const queueLengthRef = useRef<number>(0);
+  const doctorsLengthRef = useRef<number>(0);
+  const retryCountRef = useRef<number>(0);
+  const maxRetries = 3;
+
+  // Cache expiration time in milliseconds (120 seconds = 2 minutes)
+  const CACHE_EXPIRATION = 120000; 
+  // Throttle manual refresh (5 seconds)
+  const THROTTLE_DURATION = 5000;
+  // Auto-refresh interval (120 seconds = 2 minutes)
+  const AUTO_REFRESH_INTERVAL = 120000;
+
+  // Clean up on component unmount
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, []);
+
+  // Format last updated time
+  const formatLastUpdated = () => {
+    if (lastFetched === 0) return "Never";
+    
+    const now = Date.now();
+    const diff = now - lastFetched;
+    
+    if (diff < 60000) {
+      return `${Math.floor(diff / 1000)} seconds ago`;
+    } else if (diff < 3600000) {
+      return `${Math.floor(diff / 60000)} minutes ago`;
+    } else {
+      return new Date(lastFetched).toLocaleTimeString();
+    }
+  };
+
+  // Fetch queue data without auto-dependency issues
+  const fetchQueue = useCallback(async (force = false) => {
+    if (!isMountedRef.current) return;
+    
+    // Skip if data is fresh and not forced
+    if (!force && 
+        Date.now() - lastFetchedRef.current < CACHE_EXPIRATION && 
+        queueLengthRef.current > 0) {
+      return;
+    }
+    
+    setLoadingQueue(true);
+    
+    try {
+      console.log('[DEBUG] Fetching queue data at', new Date().toISOString());
+      
+      // Create an AbortController to handle timeouts
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+      
+      const response = await fetch("/api/hospital/queue", {
+        cache: 'no-store',
+        headers: {
+          'x-timestamp': Date.now().toString(),
+        },
+        signal: controller.signal
+      });
+      
+      // Clear the timeout
+      clearTimeout(timeoutId);
+      
+      if (!isMountedRef.current) return;
+      
+      if (!response.ok) {
+        throw new Error("Failed to fetch queue");
+      }
+      
+      const data = await response.json();
+      setQueue(data);
+      queueLengthRef.current = data.length;
+      
+      const timestamp = Date.now();
+      setLastFetched(timestamp);
+      lastFetchedRef.current = timestamp;
+    } catch (error) {
+      if (!isMountedRef.current) return;
+      
+      // Handle timeout errors more gracefully
+      if (error instanceof DOMException && error.name === "AbortError") {
+        console.error("Queue fetch request timed out");
+        setError("Queue data request timed out. Please try refreshing manually.");
+      } else {
+        console.error("Error fetching queue:", error);
+        setError("Failed to load the patient queue");
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setLoadingQueue(false);
+      }
+    }
+  }, []);
+
+  // Fetch doctors data without auto-dependency issues
+  const fetchDoctors = useCallback(async (force = false) => {
+    if (!isMountedRef.current) return;
+    
+    // Skip if data is fresh and not forced
+    if (!force && 
+        Date.now() - lastFetchedRef.current < CACHE_EXPIRATION && 
+        doctorsLengthRef.current > 0) {
+      return;
+    }
+    
+    setLoadingDoctors(true);
+    
+    try {
+      console.log('[DEBUG] Fetching doctors data at', new Date().toISOString());
+      
+      // Create an AbortController to handle timeouts
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+      
+      const response = await fetch("/api/hospital/doctors", {
+        cache: 'no-store',
+        headers: {
+          'x-timestamp': Date.now().toString(),
+        },
+        signal: controller.signal
+      });
+      
+      // Clear the timeout
+      clearTimeout(timeoutId);
+      
+      if (!isMountedRef.current) return;
+      
+      if (!response.ok) {
+        throw new Error("Failed to fetch doctors");
+      }
+      
+      const data = await response.json();
+      setDoctors(data);
+      doctorsLengthRef.current = data.length;
+      
+      const timestamp = Date.now();
+      setLastFetched(timestamp);
+      lastFetchedRef.current = timestamp;
+    } catch (error) {
+      if (!isMountedRef.current) return;
+      
+      // Handle timeout errors more gracefully
+      if (error instanceof DOMException && error.name === "AbortError") {
+        console.error("Doctors fetch request timed out");
+        setError("Doctors data request timed out. Please try refreshing manually.");
+      } else {
+        console.error("Error fetching doctors:", error);
+        setError("Failed to load hospital staff information");
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setLoadingDoctors(false);
+      }
+    }
+  }, []);
+
+  // Initial data load and auto-refresh setup
+  useEffect(() => {
+    // Only proceed if authenticated
+    if (status !== "authenticated" || !session?.user?.role) return;
+    
+    // Redirect non-hospital users
+    if (session.user.role !== "HOSPITAL") {
+      router.push("/");
+      return;
+    }
+    
+    // Reset retry counter on remount
+    retryCountRef.current = 0;
+    
+    // Initial fetch
+    console.log('[DEBUG] Initial data fetch at', new Date().toISOString());
+    const loadInitialData = async () => {
+      try {
+        await fetchQueue();
+        await fetchDoctors();
+        // Reset error state after successful fetch
+        setError(null);
+      } catch (err) {
+        console.error('[DEBUG] Error in initial data load:', err);
+      }
+    };
+    
+    loadInitialData();
+    
+    // Set up auto-refresh only once after component is mounted
+    if (!intervalRef.current && isMountedRef.current) {
+      console.log('[DEBUG] Setting up auto-refresh interval:', AUTO_REFRESH_INTERVAL, 'ms');
+      
+      // Clear any existing interval first to be safe
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      
+      intervalRef.current = setInterval(() => {
+        if (isMountedRef.current) {
+          console.log('[DEBUG] Auto-refresh triggered at', new Date().toISOString(), 
+            `(Retry count: ${retryCountRef.current}/${maxRetries})`);
+            
+          // If previous refreshes failed, increment retry count
+          if (error) {
+            retryCountRef.current += 1;
+            
+            // If max retries reached, stop auto-refresh to prevent flooding
+            if (retryCountRef.current > maxRetries) {
+              console.log('[DEBUG] Max retries reached, stopping auto-refresh');
+              if (intervalRef.current) {
+                clearInterval(intervalRef.current);
+                intervalRef.current = null;
+              }
+              return;
+            }
+          } else {
+            // Reset retry count on successful refreshes
+            retryCountRef.current = 0;
+          }
+          
+          // Attempt to refresh data
+          fetchQueue().catch(e => console.error('[DEBUG] Auto-refresh queue error:', e));
+          fetchDoctors().catch(e => console.error('[DEBUG] Auto-refresh doctors error:', e));
+        }
+      }, AUTO_REFRESH_INTERVAL);
+    }
+    
+    // Cleanup function
+    return () => {
+      console.log('[DEBUG] Cleanup - clearing interval and refs');
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, [status, session, router, fetchQueue, fetchDoctors, error]);
+
+  // Force refresh both queue and doctors with better error handling
+  const handleRefresh = useCallback(() => {
+    if (isRefreshThrottled) return;
+    
+    // Reset any previous errors when manually refreshing
+    setError(null);
+    
+    console.log('[DEBUG] Manual refresh triggered at', new Date().toISOString());
+    
+    // Reset retry counter
+    retryCountRef.current = 0;
+    
+    // If auto-refresh was stopped due to errors, restart it
+    if (!intervalRef.current && isMountedRef.current) {
+      console.log('[DEBUG] Reestablishing auto-refresh interval after manual refresh');
+      
+      intervalRef.current = setInterval(() => {
+        if (isMountedRef.current) {
+          console.log('[DEBUG] Auto-refresh triggered at', new Date().toISOString());
+          fetchQueue().catch(e => console.error('[DEBUG] Auto-refresh queue error:', e));
+          fetchDoctors().catch(e => console.error('[DEBUG] Auto-refresh doctors error:', e));
+        }
+      }, AUTO_REFRESH_INTERVAL);
+    }
+    
+    // Force refresh data
+    fetchQueue(true).catch(e => console.error('[DEBUG] Manual refresh queue error:', e));
+    fetchDoctors(true).catch(e => console.error('[DEBUG] Manual refresh doctors error:', e));
+    
+    // Throttle to prevent rapid refreshes
+    setIsRefreshThrottled(true);
+    setTimeout(() => {
+      if (isMountedRef.current) {
+        setIsRefreshThrottled(false);
+      }
+    }, THROTTLE_DURATION);
+  }, [fetchQueue, fetchDoctors, isRefreshThrottled]);
+
+  // Handle completing a report
+  const handleCompleteReport = useCallback(async (reportId: string) => {
+    try {
+      // Set processing state for this report
+      setProcessingReport(reportId);
+      
+      const response = await fetch(`/api/reports/${reportId}/complete`, {
+        method: "POST",
+      });
+      
+      if (!isMountedRef.current) return;
+      
+      if (!response.ok) {
+        throw new Error("Failed to complete report");
+      }
+      
+      // Refresh the queue and doctors
+      fetchQueue(true);
+      fetchDoctors(true);
+    } catch (error) {
+      if (!isMountedRef.current) return;
+      console.error("Error completing report:", error);
+      setError("Failed to complete this patient's visit");
+    } finally {
+      if (isMountedRef.current) {
+        // Clear processing state
+        setProcessingReport(null);
+      }
+    }
+  }, [fetchQueue, fetchDoctors]);
+
+  // Toggle expanded report
+  const toggleExpandReport = useCallback((reportId: string) => {
+    setExpandedReport(prev => prev === reportId ? null : reportId);
+  }, []);
+
+  // Memoized helper function to format AI analysis for display
+  const formatAiAnalysis = useCallback((analysis: string) => {
+    if (!analysis) return null;
+    
+    // Split by headings and wrap in proper HTML
+    return analysis
+      .split(/\d+\./).map((section, index) => {
+        if (index === 0 && !section.trim()) return null;
+        
+        const lines = section.trim().split('\n');
+        const heading = lines[0].trim();
+        const content = lines.slice(1).join('\n').trim();
+        
+        if (!heading) return null;
+        
+        return (
+          <div key={index} className="mb-2">
+            <p className="font-semibold text-gray-700">{heading}</p>
+            <p className="text-sm text-gray-600">{content}</p>
+          </div>
+        );
+      })
+      .filter(Boolean);
+  }, []);
+
+  // Memoized function to determine priority badge color
+  const getPriorityBadgeColor = useCallback((severity: number | undefined) => {
+    if (!severity) return "bg-gray-100 text-gray-800 border border-gray-200";
+    if (severity >= 8) return "bg-red-100 text-red-800 border border-red-200";
+    if (severity >= 6) return "bg-orange-100 text-orange-800 border border-orange-200";
+    if (severity >= 4) return "bg-yellow-100 text-yellow-800 border border-yellow-200";
+    return "bg-green-100 text-green-800 border border-green-200";
+  }, []);
+
+  // Memoize the tab content to prevent unnecessary re-renders
+  const queueTabContent = useMemo(() => (
+    <>
+      {loadingQueue && queue.length === 0 ? (
+        <QueueSkeleton />
+      ) : queue.length === 0 ? (
+        <div className="rounded-md bg-gray-50 p-8 text-center">
+          <h3 className="mt-2 text-sm font-medium text-gray-900">No patients in queue</h3>
+          <p className="mt-1 text-sm text-gray-500">
+            The queue is currently empty.
+          </p>
+        </div>
+      ) : (
+        <div className="overflow-hidden bg-white shadow sm:rounded-md">
+          <ul role="list" className="divide-y divide-gray-200">
+            {queue.map((item) => (
+              <li key={item.id} className="px-0 py-4 sm:px-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-indigo-100 text-lg font-semibold text-indigo-800">
+                      {item.queuePosition}
+                    </div>
+                    <div className="ml-4 flex items-center">
+                      {item.user.image ? (
+                        <Image
+                          className="h-10 w-10 rounded-full"
+                          src={item.user.image}
+                          alt=""
+                          width={40}
+                          height={40}
+                        />
+                      ) : (
+                        <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-700">
+                          {item.user.name?.charAt(0) || "U"}
+                        </div>
+                      )}
+                      <div className="ml-3">
+                        <p className="text-sm font-medium text-gray-900">{item.user.name}</p>
+                        <p className="text-xs text-gray-600">{item.user.email}</p>
+                        {item.doctor && (
+                          <p className="text-xs text-indigo-600 mt-1">
+                            Assigned to: {item.doctor.name} ({item.doctor.specialty})
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center">
+                    {item.severity !== null && (
+                      <span
+                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium mr-3 ${
+                          getPriorityBadgeColor(item.severity)
+                        }`}
+                      >
+                        Severity: {item.severity}/10
+                      </span>
+                    )}
+                    <button
+                      onClick={() => toggleExpandReport(item.id)}
+                      className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium leading-4 text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 mr-2"
+                    >
+                      {expandedReport === item.id ? "Hide Details" : "View Details"}
+                    </button>
+                    <button
+                      onClick={() => handleCompleteReport(item.id)}
+                      disabled={processingReport === item.id}
+                      className={`inline-flex items-center rounded-md border ${
+                        processingReport === item.id
+                          ? 'border-gray-300 bg-gray-100 text-gray-500 cursor-not-allowed'
+                          : 'border-transparent bg-indigo-600 text-white hover:bg-indigo-700'
+                      } px-3 py-2 text-sm font-medium leading-4 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2`}
+                    >
+                      {processingReport === item.id ? (
+                        <span className="flex items-center">
+                          <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Processing...
+                        </span>
+                      ) : "Complete Visit"}
+                    </button>
+                  </div>
+                </div>
+                
+                {expandedReport === item.id && (
+                  <div className="mt-4 ml-14 bg-gray-50 p-4 rounded-md">
+                    <h4 className="font-medium text-gray-900 mb-2">AI Analysis</h4>
+                    <div className="text-sm">
+                      {item.aiAnalysis ? (
+                        <div className="space-y-2">
+                          {formatAiAnalysis(item.aiAnalysis)}
+                        </div>
+                      ) : (
+                        <p className="text-gray-500">No analysis available</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
+                <div className="mt-1 ml-14">
+                  <p className="text-xs text-gray-400">
+                    Uploaded {new Date(item.uploatedAt).toLocaleString()}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </>
+  ), [queue, loadingQueue, expandedReport, getPriorityBadgeColor, toggleExpandReport, handleCompleteReport, formatAiAnalysis, processingReport]);
+
+  // Memoize doctors tab content
+  const doctorsTabContent = useMemo(() => (
+    <>
+      {loadingDoctors && doctors.length === 0 ? (
+        <DoctorsSkeleton />
+      ) : (
+        <div className="overflow-hidden bg-white shadow sm:rounded-md">
+          <div className="px-4 py-5 sm:px-6 bg-gray-50">
+            <h3 className="text-base font-semibold leading-6 text-gray-900">Hospital Staff</h3>
+            <p className="mt-1 max-w-2xl text-sm text-gray-500">
+              List of doctors and their current patients
+            </p>
+          </div>
+          {doctors.length === 0 ? (
+            <div className="p-6 text-center text-gray-700">
+              No doctors available. Add hospital staff from settings.
+            </div>
+          ) : (
+            <>
+              {doctors.every(doctor => doctor.patientCount === 0) && (
+                <div className="px-4 py-3 bg-blue-50 text-blue-700 text-sm">
+                  <p>All doctors are available. No patients have been assigned to any doctor yet.</p>
+                </div>
+              )}
+              <ul role="list" className="divide-y divide-gray-200">
+                {doctors.map((doctor, index) => (
+                  <li key={doctor.id} className={`px-4 py-4 sm:px-6 ${index === 0 && doctor.patientCount > 0 ? 'bg-indigo-50 border-l-4 border-indigo-500' : ''}`}>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="flex items-center">
+                          <h4 className="text-lg font-medium text-gray-900">{doctor.name}</h4>
+                          {index === 0 && doctor.patientCount > 0 && (
+                            <span className="ml-2 inline-flex items-center rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-medium text-indigo-800">
+                              Highest Load
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-1 flex items-center">
+                          <span className="mr-2 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">
+                            {doctor.specialty}
+                          </span>
+                          <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${doctor.available ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                            {doctor.available ? 'Available' : 'Busy'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm text-gray-900">Current Patients</div>
+                        <div className={`mt-1 text-lg font-semibold ${doctor.patientCount > 0 ? 'text-indigo-600' : 'text-gray-700'}`}>{doctor.patientCount}</div>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
+      )}
+    </>
+  ), [doctors, loadingDoctors]);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Hospital Dashboard</h1>
+          <p className="text-xs text-gray-500 mt-1">
+            Last updated: {formatLastUpdated()}
+            {loadingQueue || loadingDoctors ? " • Refreshing..." : ""}
+          </p>
+        </div>
+        <div className="flex space-x-4">
+          <button
+            onClick={handleRefresh}
+            disabled={loadingQueue || loadingDoctors || isRefreshThrottled}
+            className={`rounded-md px-3 py-2 text-sm font-medium shadow-sm ring-1 ring-inset 
+              ${(loadingQueue || loadingDoctors || isRefreshThrottled) 
+                ? 'bg-gray-100 text-gray-400 ring-gray-200 cursor-not-allowed' 
+                : 'bg-white text-gray-700 ring-gray-300 hover:bg-gray-50'}`}
+          >
+            {loadingQueue || loadingDoctors ? (
+              <span className="flex items-center">
+                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Refreshing...
+              </span>
+            ) : isRefreshThrottled ? "Please wait..." : "Refresh Data"}
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <div className="rounded-md bg-red-50 p-4 border border-red-200">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg
+                className="h-5 w-5 text-red-400"
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                aria-hidden="true"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </div>
+            <div className="ml-3 flex-grow">
+              <h3 className="text-sm font-medium text-red-800">Error Loading Dashboard</h3>
+              <div className="mt-2 text-sm text-red-700">
+                <p>{error}</p>
+                <p className="mt-1">Try refreshing the dashboard or check your network connection.</p>
+              </div>
+            </div>
+            <div className="ml-auto pl-3">
+              <button
+                onClick={handleRefresh}
+                disabled={isRefreshThrottled}
+                className={`inline-flex items-center rounded-md px-2.5 py-1.5 text-sm font-medium 
+                  ${isRefreshThrottled 
+                    ? 'bg-red-100 text-red-400 cursor-not-allowed' 
+                    : 'bg-red-100 text-red-700 hover:bg-red-200'}`}
+              >
+                {isRefreshThrottled ? 'Please wait...' : 'Retry Now'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tab navigation */}
+      <div className="border-b border-gray-200">
+        <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+          <button
+            onClick={() => setActiveTab('queue')}
+            className={`px-3 py-2 border-b-2 font-medium text-sm ${
+              activeTab === 'queue'
+                ? 'border-indigo-500 text-indigo-600'
+                : 'border-transparent text-gray-700 hover:text-gray-900 hover:border-gray-300'
+            }`}
+          >
+            Patient Queue {loadingQueue && activeTab !== 'queue' && (
+              <span className="ml-2 inline-block h-3 w-3 rounded-full bg-indigo-500 animate-pulse"></span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('doctors')}
+            className={`ml-8 px-3 py-2 border-b-2 font-medium text-sm ${
+              activeTab === 'doctors'
+                ? 'border-indigo-500 text-indigo-600'
+                : 'border-transparent text-gray-700 hover:text-gray-900 hover:border-gray-300'
+            }`}
+          >
+            Hospital Staff {loadingDoctors && activeTab !== 'doctors' && (
+              <span className="ml-2 inline-block h-3 w-3 rounded-full bg-indigo-500 animate-pulse"></span>
+            )}
+          </button>
+        </nav>
+      </div>
+
+      {/* Tab content */}
+      {activeTab === 'queue' ? queueTabContent : doctorsTabContent}
+    </div>
+  );
+} 

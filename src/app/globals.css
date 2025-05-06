@@ -3,6 +3,10 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --light-text: #6b7280;
+  --light-bg: #f3f4f6;
+  --primary: #4f46e5;
+  --primary-foreground: #ffffff;
 }
 
 @theme inline {
@@ -15,7 +19,11 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
-    --foreground: #ededed;
+    --foreground: #f9fafb;
+    --light-text: #9ca3af;
+    --light-bg: #1f2937;
+    --primary: #6366f1;
+    --primary-foreground: #ffffff;
   }
 }
 
@@ -23,4 +31,198 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Improve text contrast for better readability */
+.text-gray-500 {
+  color: #6b7280 !important;
+}
+
+.text-gray-400 {
+  color: #9ca3af !important;
+}
+
+.bg-gray-50 {
+  background-color: #f9fafb !important;
+}
+
+/* Ensure text in buttons has good contrast */
+.text-white {
+  color: #ffffff !important;
+}
+
+/* Enhanced dropdown select styling */
+select {
+  background-color: white !important;
+  color: #4b5563 !important; /* text-gray-700 */
+  padding: 0.625rem 1rem !important; /* py-2.5 px-4 */
+  font-size: 0.95rem !important; /* slightly larger than sm */
+  line-height: 1.5 !important;
+  border-radius: 0.375rem !important; /* rounded-md */
+  appearance: none !important;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e") !important;
+  background-position: right 0.75rem center !important;
+  background-repeat: no-repeat !important;
+  background-size: 1em 1em !important;
+  padding-right: 2.5rem !important;
+  min-height: 2.75rem !important;
+  width: 100% !important;
+}
+
+select option {
+  color: #4b5563 !important; /* text-gray-700 */
+  background-color: white !important;
+  padding: 0.5rem !important;
+  font-size: 0.95rem !important;
+}
+
+select:disabled {
+  background-color: #f3f4f6 !important; /* bg-gray-100 */
+  color: #9ca3af !important; /* text-gray-400 */
+  cursor: not-allowed !important;
+  opacity: 0.7 !important;
+}
+
+/* Improve focus styles for form elements */
+select:focus {
+  border-color: #6366f1 !important; /* border-indigo-500 */
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2) !important;
+  outline: none !important; 
+}
+
+input:focus, 
+textarea:focus {
+  border-color: #6366f1 !important; /* border-indigo-500 */
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2) !important;
+}
+
+/* Fix text input styling for better visibility */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="date"],
+input[type="tel"],
+textarea {
+  background-color: white !important;
+  color: #4b5563 !important; /* text-gray-700 */
+  padding: 0.625rem 1rem !important; /* match select padding */
+  font-size: 0.95rem !important; /* match select font size */
+  min-height: 2.75rem !important;
+}
+
+input::placeholder {
+  color: #9ca3af !important; /* text-gray-400 */
+}
+
+input:disabled {
+  background-color: #f3f4f6 !important; /* bg-gray-100 */
+  color: #9ca3af !important; /* text-gray-400 */
+  cursor: not-allowed !important;
+  opacity: 0.7 !important;
+}
+
+/* Optimized loading animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes skeletonPulse {
+  0% { opacity: 0.5; }
+  50% { opacity: 0.8; }
+  100% { opacity: 0.5; }
+}
+
+@keyframes slideIn {
+  from { transform: translateX(-10px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-in;
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+.animate-slideIn {
+  animation: slideIn 0.3s ease-out forwards;
+}
+
+.animate-scaleIn {
+  animation: scaleIn 0.3s ease-out forwards;
+}
+
+.skeleton-pulse {
+  animation: skeletonPulse 1.5s ease-in-out infinite;
+}
+
+/* Performance optimizations for animations */
+.animate-pulse {
+  animation: skeletonPulse 1.5s ease-in-out infinite;
+  will-change: opacity;
+}
+
+.animate-spin {
+  will-change: transform;
+}
+
+/* Reduce motion for users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulse,
+  .animate-spin,
+  .fade-in,
+  .animate-fadeIn,
+  .animate-slideIn,
+  .animate-scaleIn,
+  .skeleton-pulse {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* Enhance transitions for smooth UI */
+.transition-transform {
+  transition-property: transform;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 300ms;
+  will-change: transform;
+}
+
+.transition-opacity {
+  transition-property: opacity;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 300ms;
+  will-change: opacity;
+}
+
+/* Fix potential contrast issues in hospital dashboard */
+.bg-indigo-50 {
+  background-color: #eef2ff !important;
+}
+
+.text-indigo-600 {
+  color: #4f46e5 !important;
+}
+
+.text-indigo-800 {
+  color: #3730a3 !important;
+}
+
+/* Add smooth scrolling for better UX */
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
 }

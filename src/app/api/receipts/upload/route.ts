@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { authOptions } from "../../auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth";
 import { uploadReceipt } from "@/services/queue";
 
 export async function POST(request: Request) {
@@ -43,7 +43,11 @@ export async function POST(request: Request) {
       queuePosition: receipt.queuePosition,
       hospitalName: receipt.hospital?.name,
       severity: receipt.severity,
-      processedAt: receipt.processedAt
+      aiAnalysis: receipt.aiAnalysis,
+      doctor: receipt.doctor ? {
+        name: receipt.doctor.name,
+        specialty: receipt.doctor.specialty
+      } : null
     });
   } catch (error) {
     console.error("Error processing receipt:", error);

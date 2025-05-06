@@ -90,7 +90,7 @@ export default function HospitalRegisterPage() {
             <h3 className="text-md font-medium text-gray-700 mb-3">Administrator Details</h3>
             
             <div className="mb-4">
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
                 Full Name
               </label>
               <input
@@ -100,12 +100,12 @@ export default function HospitalRegisterPage() {
                 required
                 value={formData.name}
                 onChange={handleChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-white text-gray-700 py-2.5 px-4"
               />
             </div>
             
             <div className="mb-4">
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
                 Email address
               </label>
               <input
@@ -115,7 +115,7 @@ export default function HospitalRegisterPage() {
                 required
                 value={formData.email}
                 onChange={handleChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-white text-gray-700 py-2.5 px-4"
               />
               <p className="mt-1 text-xs text-gray-500">
                 Note: This email will be used for hospital administrator login only.
@@ -123,7 +123,7 @@ export default function HospitalRegisterPage() {
             </div>
             
             <div className="mb-4">
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
                 Password
               </label>
               <input
@@ -133,7 +133,7 @@ export default function HospitalRegisterPage() {
                 required
                 value={formData.password}
                 onChange={handleChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-white text-gray-700 py-2.5 px-4"
               />
             </div>
           </div>
@@ -142,7 +142,7 @@ export default function HospitalRegisterPage() {
             <h3 className="text-md font-medium text-gray-700 mb-3">Hospital Details</h3>
             
             <div className="mb-4">
-              <label htmlFor="hospitalName" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="hospitalName" className="block text-sm font-medium text-gray-700 mb-1">
                 Hospital Name
               </label>
               <input
@@ -152,12 +152,12 @@ export default function HospitalRegisterPage() {
                 required
                 value={formData.hospitalName}
                 onChange={handleChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-white text-gray-700 py-2.5 px-4"
               />
             </div>
             
             <div className="mb-4">
-              <label htmlFor="address" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-1">
                 Address
               </label>
               <input
@@ -167,13 +167,13 @@ export default function HospitalRegisterPage() {
                 required
                 value={formData.address}
                 onChange={handleChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-white text-gray-700 py-2.5 px-4"
               />
             </div>
             
             <div className="grid grid-cols-2 gap-4">
               <div className="mb-4">
-                <label htmlFor="state" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="state" className="block text-sm font-medium text-gray-700 mb-1">
                   State
                 </label>
                 <select
@@ -182,11 +182,11 @@ export default function HospitalRegisterPage() {
                   required
                   value={formData.state}
                   onChange={handleChange}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-white text-gray-700 py-2.5 px-4"
                 >
-                  <option value="">Select a state</option>
+                  <option value="" className="text-gray-700">Select a state</option>
                   {indianStates.map((state) => (
-                    <option key={state} value={state}>
+                    <option key={state} value={state} className="text-gray-700">
                       {state}
                     </option>
                   ))}
@@ -194,7 +194,7 @@ export default function HospitalRegisterPage() {
               </div>
               
               <div className="mb-4">
-                <label htmlFor="city" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">
                   City
                 </label>
                 <input
@@ -204,13 +204,13 @@ export default function HospitalRegisterPage() {
                   required
                   value={formData.city}
                   onChange={handleChange}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-white text-gray-700 py-2.5 px-4"
                 />
               </div>
             </div>
             
             <div className="mb-4">
-              <label htmlFor="pincode" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="pincode" className="block text-sm font-medium text-gray-700 mb-1">
                 PIN Code
               </label>
               <input
@@ -220,7 +220,7 @@ export default function HospitalRegisterPage() {
                 required
                 value={formData.pincode}
                 onChange={handleChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-white text-gray-700 py-2.5 px-4"
               />
             </div>
           </div>

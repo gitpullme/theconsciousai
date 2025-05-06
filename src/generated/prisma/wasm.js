@@ -122,7 +122,13 @@ exports.Prisma.UserScalarFieldEnum = {
   image: 'image',
   role: 'role',
   state: 'state',
-  hospital: 'hospital'
+  hospital: 'hospital',
+  address: 'address',
+  dateOfBirth: 'dateOfBirth',
+  gender: 'gender',
+  phone: 'phone',
+  city: 'city',
+  pincode: 'pincode'
 };
 
 exports.Prisma.VerificationTokenScalarFieldEnum = {
@@ -142,7 +148,8 @@ exports.Prisma.ReceiptScalarFieldEnum = {
   hospitalId: 'hospitalId',
   status: 'status',
   queuePosition: 'queuePosition',
-  aiAnalysis: 'aiAnalysis'
+  aiAnalysis: 'aiAnalysis',
+  doctorId: 'doctorId'
 };
 
 exports.Prisma.HospitalScalarFieldEnum = {
@@ -158,9 +165,61 @@ exports.Prisma.StateScalarFieldEnum = {
   name: 'name'
 };
 
+exports.Prisma.DoctorScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  specialty: 'specialty',
+  hospitalId: 'hospitalId',
+  available: 'available'
+};
+
+exports.Prisma.AppointmentScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  hospitalId: 'hospitalId',
+  doctorId: 'doctorId',
+  symptoms: 'symptoms',
+  aiAnalysis: 'aiAnalysis',
+  severity: 'severity',
+  status: 'status',
+  preferredDate: 'preferredDate',
+  scheduledDate: 'scheduledDate',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.EmergencyAlertScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  hospitalId: 'hospitalId',
+  status: 'status',
+  patientInfo: 'patientInfo',
+  medicalHistory: 'medicalHistory',
+  createdAt: 'createdAt',
+  respondedAt: 'respondedAt',
+  notes: 'notes'
+};
+
+exports.Prisma.MedicineReminderScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  name: 'name',
+  dosage: 'dosage',
+  frequency: 'frequency',
+  time: 'time',
+  notes: 'notes',
+  createdAt: 'createdAt',
+  isActive: 'isActive',
+  aiGenerated: 'aiGenerated'
+};
+
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
+};
+
+exports.Prisma.JsonNullValueInput = {
+  JsonNull: Prisma.JsonNull
 };
 
 exports.Prisma.QueryMode = {
@@ -172,6 +231,19 @@ exports.Prisma.NullsOrder = {
   first: 'first',
   last: 'last'
 };
+
+exports.Prisma.JsonNullValueFilter = {
+  DbNull: Prisma.DbNull,
+  JsonNull: Prisma.JsonNull,
+  AnyNull: Prisma.AnyNull
+};
+exports.AppointmentStatus = exports.$Enums.AppointmentStatus = {
+  PENDING: 'PENDING',
+  CONFIRMED: 'CONFIRMED',
+  COMPLETED: 'COMPLETED',
+  CANCELLED: 'CANCELLED'
+};
+
 exports.UserRole = exports.$Enums.UserRole = {
   USER: 'USER',
   ADMIN: 'ADMIN',
@@ -185,6 +257,13 @@ exports.ReceiptStatus = exports.$Enums.ReceiptStatus = {
   COMPLETED: 'COMPLETED'
 };
 
+exports.EmergencyAlertStatus = exports.$Enums.EmergencyAlertStatus = {
+  PENDING: 'PENDING',
+  ACKNOWLEDGED: 'ACKNOWLEDGED',
+  RESPONDED: 'RESPONDED',
+  CLOSED: 'CLOSED'
+};
+
 exports.Prisma.ModelName = {
   Account: 'Account',
   Session: 'Session',
@@ -192,7 +271,11 @@ exports.Prisma.ModelName = {
   VerificationToken: 'VerificationToken',
   Receipt: 'Receipt',
   Hospital: 'Hospital',
-  State: 'State'
+  State: 'State',
+  Doctor: 'Doctor',
+  Appointment: 'Appointment',
+  EmergencyAlert: 'EmergencyAlert',
+  MedicineReminder: 'MedicineReminder'
 };
 /**
  * Create the Client
@@ -244,13 +327,13 @@ const config = {
       }
     }
   },
-  "inlineSchema": "// This is your Prisma schema file,\n// learn more about it in the docs: https://pris.ly/d/prisma-schema\n\n// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?\n// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init\n\ngenerator client {\n  provider        = \"prisma-client-js\"\n  output          = \"../src/generated/prisma\"\n  previewFeatures = [\"driverAdapters\"]\n}\n\ndatasource db {\n  provider  = \"postgresql\"\n  url       = env(\"DATABASE_URL\")\n  directUrl = env(\"DIRECT_URL\")\n}\n\n// Auth models\nmodel Account {\n  id                String  @id @default(cuid())\n  userId            String\n  type              String\n  provider          String\n  providerAccountId String\n  refresh_token     String? @db.Text\n  access_token      String? @db.Text\n  expires_at        Int?\n  token_type        String?\n  scope             String?\n  id_token          String? @db.Text\n  session_state     String?\n\n  user User @relation(fields: [userId], references: [id], onDelete: Cascade)\n\n  @@unique([provider, providerAccountId])\n}\n\nmodel Session {\n  id           String   @id @default(cuid())\n  sessionToken String   @unique\n  userId       String\n  expires      DateTime\n  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)\n}\n\nmodel User {\n  id            String    @id @default(cuid())\n  name          String?\n  email         String?   @unique\n  emailVerified DateTime?\n  image         String?\n  role          UserRole  @default(USER)\n  accounts      Account[]\n  sessions      Session[]\n  receipts      Receipt[]\n  state         String?\n  hospital      String?\n}\n\nenum UserRole {\n  USER\n  ADMIN\n  HOSPITAL\n}\n\nmodel VerificationToken {\n  identifier String\n  token      String   @unique\n  expires    DateTime\n\n  @@unique([identifier, token])\n}\n\n// Medical receipt and queue models\nmodel Receipt {\n  id            String        @id @default(cuid())\n  userId        String\n  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)\n  imageUrl      String\n  uploatedAt    DateTime      @default(now())\n  processedAt   DateTime?\n  condition     String?\n  severity      Int?          @default(0) // Higher number means more severe\n  hospitalId    String?\n  hospital      Hospital?     @relation(fields: [hospitalId], references: [id])\n  status        ReceiptStatus @default(PENDING)\n  queuePosition Int?\n  aiAnalysis    String?       @db.Text\n}\n\nenum ReceiptStatus {\n  PENDING\n  PROCESSED\n  QUEUED\n  COMPLETED\n}\n\nmodel Hospital {\n  id       String    @id @default(cuid())\n  name     String\n  state    String\n  city     String?\n  address  String?\n  receipts Receipt[]\n}\n\nmodel State {\n  id   String @id @default(cuid())\n  name String @unique\n}\n",
-  "inlineSchemaHash": "e0aa9c3cf2401a6d0eec6846c48404c57da9da7770f8dbdef9a5b1059274c7b3",
+  "inlineSchema": "generator client {\n  provider        = \"prisma-client-js\"\n  output          = \"../src/generated/prisma\"\n  previewFeatures = [\"driverAdapters\"]\n}\n\ndatasource db {\n  provider  = \"postgresql\"\n  url       = env(\"DATABASE_URL\")\n  directUrl = env(\"DIRECT_URL\")\n}\n\nmodel Account {\n  id                String  @id @default(cuid())\n  userId            String\n  type              String\n  provider          String\n  providerAccountId String\n  refresh_token     String?\n  access_token      String?\n  expires_at        Int?\n  token_type        String?\n  scope             String?\n  id_token          String?\n  session_state     String?\n  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)\n\n  @@unique([provider, providerAccountId])\n  @@index([userId])\n  @@index([provider])\n}\n\nmodel Session {\n  id           String   @id @default(cuid())\n  sessionToken String   @unique\n  userId       String\n  expires      DateTime\n  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)\n\n  @@index([userId])\n  @@index([sessionToken])\n  @@index([expires])\n}\n\nmodel User {\n  id                String             @id @default(cuid())\n  name              String?\n  email             String?            @unique\n  emailVerified     DateTime?\n  image             String?\n  role              UserRole           @default(USER)\n  state             String?\n  hospital          String?\n  address           String?\n  dateOfBirth       DateTime?\n  gender            String?\n  phone             String?\n  city              String?\n  pincode           String?\n  accounts          Account[]\n  sessions          Session[]\n  appointments      Appointment[]\n  receipts          Receipt[]\n  emergencyAlerts   EmergencyAlert[]   @relation(\"PatientAlerts\")\n  medicineReminders MedicineReminder[]\n\n  @@index([role, hospital])\n  @@index([email])\n  @@index([state])\n  @@index([email, role])\n  @@index([hospital, role])\n}\n\nmodel VerificationToken {\n  identifier String\n  token      String   @unique\n  expires    DateTime\n\n  @@unique([identifier, token])\n}\n\nmodel Receipt {\n  id            String        @id @default(cuid())\n  userId        String\n  imageUrl      String\n  uploatedAt    DateTime      @default(now())\n  processedAt   DateTime?\n  condition     String?\n  severity      Int?          @default(0)\n  hospitalId    String?\n  status        ReceiptStatus @default(PENDING)\n  queuePosition Int?\n  aiAnalysis    String?\n  doctorId      String?\n  doctor        Doctor?       @relation(fields: [doctorId], references: [id])\n  hospital      Hospital?     @relation(fields: [hospitalId], references: [id])\n  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)\n\n  @@index([userId])\n  @@index([hospitalId])\n  @@index([doctorId])\n  @@index([status])\n}\n\nmodel Hospital {\n  id              String           @id @default(cuid())\n  name            String\n  state           String\n  city            String?\n  address         String?\n  doctors         Doctor[]\n  receipts        Receipt[]\n  appointments    Appointment[]\n  emergencyAlerts EmergencyAlert[] @relation(\"HospitalAlerts\")\n\n  @@index([state, city])\n  @@index([name])\n  @@index([state])\n}\n\nmodel State {\n  id   String @id @default(cuid())\n  name String @unique\n}\n\nmodel Doctor {\n  id           String        @id @default(cuid())\n  name         String\n  specialty    String\n  hospitalId   String\n  available    Boolean       @default(true)\n  hospital     Hospital      @relation(fields: [hospitalId], references: [id])\n  patients     Receipt[]\n  appointments Appointment[]\n\n  @@index([hospitalId])\n  @@index([specialty])\n  @@index([available])\n}\n\n// Appointment model for scheduling\nmodel Appointment {\n  id            String            @id @default(cuid())\n  userId        String\n  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)\n  hospitalId    String\n  hospital      Hospital          @relation(fields: [hospitalId], references: [id])\n  doctorId      String?\n  doctor        Doctor?           @relation(fields: [doctorId], references: [id])\n  symptoms      String            @db.Text\n  aiAnalysis    String?           @db.Text\n  severity      Int?              @default(0) // Higher number means more severe\n  status        AppointmentStatus @default(PENDING)\n  preferredDate DateTime\n  scheduledDate DateTime?\n  createdAt     DateTime          @default(now())\n  updatedAt     DateTime          @updatedAt\n\n  @@index([userId])\n  @@index([hospitalId])\n  @@index([doctorId])\n  @@index([status])\n  @@index([preferredDate])\n}\n\n// Emergency Alert model for urgent patient situations\nmodel EmergencyAlert {\n  id             String               @id @default(cuid())\n  userId         String\n  user           User                 @relation(\"PatientAlerts\", fields: [userId], references: [id])\n  hospitalId     String\n  hospital       Hospital             @relation(\"HospitalAlerts\", fields: [hospitalId], references: [id])\n  status         EmergencyAlertStatus @default(PENDING)\n  patientInfo    Json // Stores patient contact and location details\n  medicalHistory Json // Stores recent medical reports and conditions\n  createdAt      DateTime             @default(now())\n  respondedAt    DateTime?\n  notes          String?              @db.Text\n\n  @@index([userId])\n  @@index([hospitalId])\n  @@index([status])\n  @@index([createdAt])\n}\n\n// Medicine Reminder model for tracking medication schedules\nmodel MedicineReminder {\n  id          String   @id @default(cuid())\n  userId      String\n  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)\n  name        String\n  dosage      String\n  frequency   String\n  time        String\n  notes       String?  @db.Text\n  createdAt   DateTime @default(now())\n  isActive    Boolean  @default(true)\n  aiGenerated Boolean  @default(false)\n\n  @@index([userId])\n  @@index([isActive])\n}\n\nenum AppointmentStatus {\n  PENDING\n  CONFIRMED\n  COMPLETED\n  CANCELLED\n}\n\nenum UserRole {\n  USER\n  ADMIN\n  HOSPITAL\n}\n\nenum ReceiptStatus {\n  PENDING\n  PROCESSED\n  QUEUED\n  COMPLETED\n}\n\nenum EmergencyAlertStatus {\n  PENDING\n  ACKNOWLEDGED\n  RESPONDED\n  CLOSED\n}\n",
+  "inlineSchemaHash": "047c0d654d1d8dbe0081b394b2f77a9f48fb70a670ef210436bb7f875fae67be",
   "copyEngine": true
 }
 config.dirname = '/'
 
-config.runtimeDataModel = JSON.parse("{\"models\":{\"Account\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"userId\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"type\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"provider\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"providerAccountId\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"refresh_token\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"access_token\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"expires_at\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"token_type\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"scope\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"id_token\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"session_state\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"user\",\"kind\":\"object\",\"type\":\"User\",\"relationName\":\"AccountToUser\"}],\"dbName\":null},\"Session\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"sessionToken\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"userId\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"expires\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"user\",\"kind\":\"object\",\"type\":\"User\",\"relationName\":\"SessionToUser\"}],\"dbName\":null},\"User\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"name\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"email\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"emailVerified\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"image\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"role\",\"kind\":\"enum\",\"type\":\"UserRole\"},{\"name\":\"accounts\",\"kind\":\"object\",\"type\":\"Account\",\"relationName\":\"AccountToUser\"},{\"name\":\"sessions\",\"kind\":\"object\",\"type\":\"Session\",\"relationName\":\"SessionToUser\"},{\"name\":\"receipts\",\"kind\":\"object\",\"type\":\"Receipt\",\"relationName\":\"ReceiptToUser\"},{\"name\":\"state\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"hospital\",\"kind\":\"scalar\",\"type\":\"String\"}],\"dbName\":null},\"VerificationToken\":{\"fields\":[{\"name\":\"identifier\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"token\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"expires\",\"kind\":\"scalar\",\"type\":\"DateTime\"}],\"dbName\":null},\"Receipt\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"userId\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"user\",\"kind\":\"object\",\"type\":\"User\",\"relationName\":\"ReceiptToUser\"},{\"name\":\"imageUrl\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"uploatedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"processedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"condition\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"severity\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"hospitalId\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"hospital\",\"kind\":\"object\",\"type\":\"Hospital\",\"relationName\":\"HospitalToReceipt\"},{\"name\":\"status\",\"kind\":\"enum\",\"type\":\"ReceiptStatus\"},{\"name\":\"queuePosition\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"aiAnalysis\",\"kind\":\"scalar\",\"type\":\"String\"}],\"dbName\":null},\"Hospital\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"name\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"state\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"city\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"address\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"receipts\",\"kind\":\"object\",\"type\":\"Receipt\",\"relationName\":\"HospitalToReceipt\"}],\"dbName\":null},\"State\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"name\",\"kind\":\"scalar\",\"type\":\"String\"}],\"dbName\":null}},\"enums\":{},\"types\":{}}")
+config.runtimeDataModel = JSON.parse("{\"models\":{\"Account\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"userId\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"type\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"provider\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"providerAccountId\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"refresh_token\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"access_token\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"expires_at\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"token_type\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"scope\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"id_token\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"session_state\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"user\",\"kind\":\"object\",\"type\":\"User\",\"relationName\":\"AccountToUser\"}],\"dbName\":null},\"Session\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"sessionToken\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"userId\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"expires\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"user\",\"kind\":\"object\",\"type\":\"User\",\"relationName\":\"SessionToUser\"}],\"dbName\":null},\"User\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"name\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"email\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"emailVerified\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"image\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"role\",\"kind\":\"enum\",\"type\":\"UserRole\"},{\"name\":\"state\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"hospital\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"address\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"dateOfBirth\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"gender\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"phone\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"city\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"pincode\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"accounts\",\"kind\":\"object\",\"type\":\"Account\",\"relationName\":\"AccountToUser\"},{\"name\":\"sessions\",\"kind\":\"object\",\"type\":\"Session\",\"relationName\":\"SessionToUser\"},{\"name\":\"appointments\",\"kind\":\"object\",\"type\":\"Appointment\",\"relationName\":\"AppointmentToUser\"},{\"name\":\"receipts\",\"kind\":\"object\",\"type\":\"Receipt\",\"relationName\":\"ReceiptToUser\"},{\"name\":\"emergencyAlerts\",\"kind\":\"object\",\"type\":\"EmergencyAlert\",\"relationName\":\"PatientAlerts\"},{\"name\":\"medicineReminders\",\"kind\":\"object\",\"type\":\"MedicineReminder\",\"relationName\":\"MedicineReminderToUser\"}],\"dbName\":null},\"VerificationToken\":{\"fields\":[{\"name\":\"identifier\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"token\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"expires\",\"kind\":\"scalar\",\"type\":\"DateTime\"}],\"dbName\":null},\"Receipt\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"userId\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"imageUrl\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"uploatedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"processedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"condition\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"severity\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"hospitalId\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"status\",\"kind\":\"enum\",\"type\":\"ReceiptStatus\"},{\"name\":\"queuePosition\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"aiAnalysis\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"doctorId\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"doctor\",\"kind\":\"object\",\"type\":\"Doctor\",\"relationName\":\"DoctorToReceipt\"},{\"name\":\"hospital\",\"kind\":\"object\",\"type\":\"Hospital\",\"relationName\":\"HospitalToReceipt\"},{\"name\":\"user\",\"kind\":\"object\",\"type\":\"User\",\"relationName\":\"ReceiptToUser\"}],\"dbName\":null},\"Hospital\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"name\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"state\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"city\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"address\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"doctors\",\"kind\":\"object\",\"type\":\"Doctor\",\"relationName\":\"DoctorToHospital\"},{\"name\":\"receipts\",\"kind\":\"object\",\"type\":\"Receipt\",\"relationName\":\"HospitalToReceipt\"},{\"name\":\"appointments\",\"kind\":\"object\",\"type\":\"Appointment\",\"relationName\":\"AppointmentToHospital\"},{\"name\":\"emergencyAlerts\",\"kind\":\"object\",\"type\":\"EmergencyAlert\",\"relationName\":\"HospitalAlerts\"}],\"dbName\":null},\"State\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"name\",\"kind\":\"scalar\",\"type\":\"String\"}],\"dbName\":null},\"Doctor\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"name\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"specialty\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"hospitalId\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"available\",\"kind\":\"scalar\",\"type\":\"Boolean\"},{\"name\":\"hospital\",\"kind\":\"object\",\"type\":\"Hospital\",\"relationName\":\"DoctorToHospital\"},{\"name\":\"patients\",\"kind\":\"object\",\"type\":\"Receipt\",\"relationName\":\"DoctorToReceipt\"},{\"name\":\"appointments\",\"kind\":\"object\",\"type\":\"Appointment\",\"relationName\":\"AppointmentToDoctor\"}],\"dbName\":null},\"Appointment\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"userId\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"user\",\"kind\":\"object\",\"type\":\"User\",\"relationName\":\"AppointmentToUser\"},{\"name\":\"hospitalId\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"hospital\",\"kind\":\"object\",\"type\":\"Hospital\",\"relationName\":\"AppointmentToHospital\"},{\"name\":\"doctorId\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"doctor\",\"kind\":\"object\",\"type\":\"Doctor\",\"relationName\":\"AppointmentToDoctor\"},{\"name\":\"symptoms\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"aiAnalysis\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"severity\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"status\",\"kind\":\"enum\",\"type\":\"AppointmentStatus\"},{\"name\":\"preferredDate\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"scheduledDate\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"updatedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"}],\"dbName\":null},\"EmergencyAlert\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"userId\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"user\",\"kind\":\"object\",\"type\":\"User\",\"relationName\":\"PatientAlerts\"},{\"name\":\"hospitalId\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"hospital\",\"kind\":\"object\",\"type\":\"Hospital\",\"relationName\":\"HospitalAlerts\"},{\"name\":\"status\",\"kind\":\"enum\",\"type\":\"EmergencyAlertStatus\"},{\"name\":\"patientInfo\",\"kind\":\"scalar\",\"type\":\"Json\"},{\"name\":\"medicalHistory\",\"kind\":\"scalar\",\"type\":\"Json\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"respondedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"notes\",\"kind\":\"scalar\",\"type\":\"String\"}],\"dbName\":null},\"MedicineReminder\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"userId\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"user\",\"kind\":\"object\",\"type\":\"User\",\"relationName\":\"MedicineReminderToUser\"},{\"name\":\"name\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"dosage\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"frequency\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"time\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"notes\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"isActive\",\"kind\":\"scalar\",\"type\":\"Boolean\"},{\"name\":\"aiGenerated\",\"kind\":\"scalar\",\"type\":\"Boolean\"}],\"dbName\":null}},\"enums\":{},\"types\":{}}")
 defineDmmfProperty(exports.Prisma, config.runtimeDataModel)
 config.engineWasm = {
   getRuntime: async () => require('./query_engine_bg.js'),

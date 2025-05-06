@@ -4,24 +4,42 @@ import { signIn, useSession } from "next-auth/react";
 import { redirect, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useMemo } from "react";
+
+// Optimized debounce function to reduce unnecessary re-renders
+function useDebounce<T>(value: T, delay: number = 500): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+
+  return debouncedValue;
+}
 
 export default function LoginPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const isAdmin = searchParams.get("admin") === "true";
-  const hospitalRegistered = searchParams.get("hospital") === "registered";
   
-  const [isLogin, setIsLogin] = useState(true);
-  const [userType, setUserType] = useState(isAdmin ? "admin" : "user");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState(hospitalRegistered ? "Hospital registration successful! Please login with your credentials." : "");
-  const [loading, setLoading] = useState(false);
+  // Cache these values to prevent unnecessary re-computations
+  const isAdmin = useMemo(() => searchParams.get("admin") === "true", [searchParams]);
+  const hospitalRegistered = useMemo(() => searchParams.get("hospital") === "registered", [searchParams]);
+  
+  // Combined form state to minimize state updates
+  const [formState, setFormState] = useState({
+    isLogin: true,
+    userType: isAdmin ? "admin" : "user",
+    email: "",
+    password: "",
+    name: "",
+    error: "",
+    success: hospitalRegistered ? "Hospital registration successful! Please login with your credentials." : "",
+    loading: false
+  });
 
+  // Handle dashboard redirect after successful login
   useEffect(() => {
     if (status === "authenticated") {
       // Redirect to appropriate dashboard based on user role
@@ -37,15 +55,39 @@ export default function LoginPage() {
     }
   }, [session, status, router]);
 
-  const handleCredentialsAuth = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-    setSuccess("");
+  // Optimized input change handler to minimize state updates
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormState(prev => ({ ...prev, [name]: value }));
+  }, []);
 
+  // Toggle login/register view
+  const toggleLoginMode = useCallback(() => {
+    setFormState(prev => ({ 
+      ...prev, 
+      isLogin: !prev.isLogin,
+      error: '', 
+      success: ''
+    }));
+  }, []);
+
+  // Set user type (patient or admin)
+  const setUserType = useCallback((type: 'user' | 'admin') => {
+    setFormState(prev => ({ ...prev, userType: type, error: '' }));
+  }, []);
+
+  // Handle form submission with optimized logic
+  const handleCredentialsAuth = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    
+    const { isLogin, email, password, name, userType } = formState;
+    
+    // Update loading state
+    setFormState(prev => ({ ...prev, loading: true, error: '', success: '' }));
+
+    try {
     if (isLogin) {
       // Handle login
-      try {
         const result = await signIn("credentials", {
           redirect: false,
           email,
@@ -54,17 +96,15 @@ export default function LoginPage() {
         });
 
         if (result?.error) {
-          setError("Invalid email or password");
-          setLoading(false);
+          setFormState(prev => ({ 
+            ...prev, 
+            error: "Invalid email or password", 
+            loading: false 
+          }));
         }
-        // Successful login will be handled by the useEffect above
-      } catch (error) {
-        setError("An error occurred during login");
-        setLoading(false);
-      }
+        // Successful login is handled by the useEffect that watches session state
     } else {
       // Handle registration (only for regular users)
-      try {
         const response = await fetch("/api/auth/register", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -74,8 +114,11 @@ export default function LoginPage() {
         const data = await response.json();
 
         if (!response.ok) {
-          setError(data.message || "Registration failed");
-          setLoading(false);
+          setFormState(prev => ({ 
+            ...prev, 
+            error: data.message || "Registration failed", 
+            loading: false 
+          }));
           return;
         }
 
@@ -87,16 +130,28 @@ export default function LoginPage() {
         });
 
         if (result?.error) {
-          setError("Registration successful but login failed. Please try logging in manually.");
-          setLoading(false);
+          setFormState(prev => ({ 
+            ...prev, 
+            error: "Registration successful but login failed. Please try logging in manually.", 
+            loading: false 
+          }));
+        }
         }
       } catch (error) {
-        console.error("Registration error:", error);
-        setError(error instanceof Error ? error.message : "Registration failed");
-        setLoading(false);
+      console.error("Auth error:", error);
+      setFormState(prev => ({ 
+        ...prev, 
+        error: error instanceof Error ? error.message : "Authentication failed", 
+        loading: false 
+      }));
       }
-    }
-  };
+  }, [formState]);
+
+  // Only show non-login content conditionally to reduce initial render time
+  const { 
+    isLogin, userType, email, password, name, 
+    error, success, loading 
+  } = formState;
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -110,7 +165,7 @@ export default function LoginPage() {
           </p>
         </div>
         
-        {/* User Type Tabs */}
+        {/* User Type Tabs - Only rendered when needed */}
         {isLogin && (
           <div className="flex rounded-md shadow-sm mb-6">
             <button
@@ -138,51 +193,42 @@ export default function LoginPage() {
           </div>
         )}
         
+        {/* Error message */}
         {error && (
           <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-4">
-            <div className="flex">
-              <div className="ml-3">
                 <p className="text-sm text-red-700">{error}</p>
-              </div>
-            </div>
           </div>
         )}
         
+        {/* Success message */}
         {success && (
           <div className="bg-green-50 border-l-4 border-green-400 p-4 mb-4">
-            <div className="flex">
-              <div className="ml-3">
                 <p className="text-sm text-green-700">{success}</p>
-              </div>
-            </div>
           </div>
         )}
         
         <form className="mt-8 space-y-6" onSubmit={handleCredentialsAuth}>
           {!isLogin && (
             <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
                 Full Name
               </label>
-              <div className="mt-1">
                 <input
                   id="name"
                   name="name"
                   type="text"
                   required
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                onChange={handleInputChange}
+                  className="block w-full rounded-md border border-gray-300 px-4 py-2.5 placeholder-gray-400 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 bg-white text-gray-700"
                 />
-              </div>
             </div>
           )}
           
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
               Email address
             </label>
-            <div className="mt-1">
               <input
                 id="email"
                 name="email"
@@ -190,17 +236,15 @@ export default function LoginPage() {
                 autoComplete="email"
                 required
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+              onChange={handleInputChange}
+                className="block w-full rounded-md border border-gray-300 px-4 py-2.5 placeholder-gray-400 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 bg-white text-gray-700"
               />
-            </div>
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
               Password
             </label>
-            <div className="mt-1">
               <input
                 id="password"
                 name="password"
@@ -208,10 +252,9 @@ export default function LoginPage() {
                 autoComplete={isLogin ? "current-password" : "new-password"}
                 required
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+              onChange={handleInputChange}
+                className="block w-full rounded-md border border-gray-300 px-4 py-2.5 placeholder-gray-400 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 bg-white text-gray-700"
               />
-            </div>
           </div>
 
           <div>
@@ -238,7 +281,7 @@ export default function LoginPage() {
           <div className="text-sm text-center mt-4">
             <button 
               type="button" 
-              onClick={() => setIsLogin(!isLogin)} 
+              onClick={toggleLoginMode} 
               className="font-medium text-indigo-600 hover:text-indigo-500"
             >
               {isLogin ? "Need an account? Register" : "Already have an account? Sign in"}

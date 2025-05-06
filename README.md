@@ -16,7 +16,7 @@ An AI-powered medical queue management system that uses Google's Gemini AI to an
 
 - **Frontend**: Next.js, React, TailwindCSS
 - **Backend**: Next.js API Routes
-- **Database**: PostgreSQL (NeonDB)
+- **Database**: PostgreSQL (Supabase)
 - **Authentication**: NextAuth.js with Google provider
 - **ORM**: Prisma
 - **AI**: Google Gemini API
@@ -27,7 +27,7 @@ An AI-powered medical queue management system that uses Google's Gemini AI to an
 
 - Node.js (v18 or later)
 - NPM or Yarn
-- NeonDB PostgreSQL database or other PostgreSQL database
+- Supabase PostgreSQL database or other PostgreSQL database
 - Google OAuth credentials
 - Google Gemini API key
 

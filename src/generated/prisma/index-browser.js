@@ -150,7 +150,13 @@ exports.Prisma.UserScalarFieldEnum = {
   image: 'image',
   role: 'role',
   state: 'state',
-  hospital: 'hospital'
+  hospital: 'hospital',
+  address: 'address',
+  dateOfBirth: 'dateOfBirth',
+  gender: 'gender',
+  phone: 'phone',
+  city: 'city',
+  pincode: 'pincode'
 };
 
 exports.Prisma.VerificationTokenScalarFieldEnum = {
@@ -170,7 +176,8 @@ exports.Prisma.ReceiptScalarFieldEnum = {
   hospitalId: 'hospitalId',
   status: 'status',
   queuePosition: 'queuePosition',
-  aiAnalysis: 'aiAnalysis'
+  aiAnalysis: 'aiAnalysis',
+  doctorId: 'doctorId'
 };
 
 exports.Prisma.HospitalScalarFieldEnum = {
@@ -186,9 +193,61 @@ exports.Prisma.StateScalarFieldEnum = {
   name: 'name'
 };
 
+exports.Prisma.DoctorScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  specialty: 'specialty',
+  hospitalId: 'hospitalId',
+  available: 'available'
+};
+
+exports.Prisma.AppointmentScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  hospitalId: 'hospitalId',
+  doctorId: 'doctorId',
+  symptoms: 'symptoms',
+  aiAnalysis: 'aiAnalysis',
+  severity: 'severity',
+  status: 'status',
+  preferredDate: 'preferredDate',
+  scheduledDate: 'scheduledDate',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.EmergencyAlertScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  hospitalId: 'hospitalId',
+  status: 'status',
+  patientInfo: 'patientInfo',
+  medicalHistory: 'medicalHistory',
+  createdAt: 'createdAt',
+  respondedAt: 'respondedAt',
+  notes: 'notes'
+};
+
+exports.Prisma.MedicineReminderScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  name: 'name',
+  dosage: 'dosage',
+  frequency: 'frequency',
+  time: 'time',
+  notes: 'notes',
+  createdAt: 'createdAt',
+  isActive: 'isActive',
+  aiGenerated: 'aiGenerated'
+};
+
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
+};
+
+exports.Prisma.JsonNullValueInput = {
+  JsonNull: Prisma.JsonNull
 };
 
 exports.Prisma.QueryMode = {
@@ -199,6 +258,12 @@ exports.Prisma.QueryMode = {
 exports.Prisma.NullsOrder = {
   first: 'first',
   last: 'last'
+};
+
+exports.Prisma.JsonNullValueFilter = {
+  DbNull: Prisma.DbNull,
+  JsonNull: Prisma.JsonNull,
+  AnyNull: Prisma.AnyNull
 };
 exports.UserRole = exports.$Enums.UserRole = {
   USER: 'USER',
@@ -213,6 +278,20 @@ exports.ReceiptStatus = exports.$Enums.ReceiptStatus = {
   COMPLETED: 'COMPLETED'
 };
 
+exports.AppointmentStatus = exports.$Enums.AppointmentStatus = {
+  PENDING: 'PENDING',
+  CONFIRMED: 'CONFIRMED',
+  COMPLETED: 'COMPLETED',
+  CANCELLED: 'CANCELLED'
+};
+
+exports.EmergencyAlertStatus = exports.$Enums.EmergencyAlertStatus = {
+  PENDING: 'PENDING',
+  ACKNOWLEDGED: 'ACKNOWLEDGED',
+  RESPONDED: 'RESPONDED',
+  CLOSED: 'CLOSED'
+};
+
 exports.Prisma.ModelName = {
   Account: 'Account',
   Session: 'Session',
@@ -220,7 +299,11 @@ exports.Prisma.ModelName = {
   VerificationToken: 'VerificationToken',
   Receipt: 'Receipt',
   Hospital: 'Hospital',
-  State: 'State'
+  State: 'State',
+  Doctor: 'Doctor',
+  Appointment: 'Appointment',
+  EmergencyAlert: 'EmergencyAlert',
+  MedicineReminder: 'MedicineReminder'
 };
 
 /**

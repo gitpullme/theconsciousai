@@ -1,39 +1,33 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
-  provider = "prisma-client-js"
-  output   = "../src/generated/prisma"
+  provider        = "prisma-client-js"
+  output          = "../src/generated/prisma"
   previewFeatures = ["driverAdapters"]
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
-// Auth models
 model Account {
   id                String  @id @default(cuid())
   userId            String
   type              String
   provider          String
   providerAccountId String
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
+  refresh_token     String?
+  access_token      String?
   expires_at        Int?
   token_type        String?
   scope             String?
-  id_token          String? @db.Text
+  id_token          String?
   session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@index([provider])
 }
 
 model Session {
@@ -42,26 +36,39 @@ model Session {
   userId       String
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([sessionToken])
+  @@index([expires])
 }
 
 model User {
-  id             String    @id @default(cuid())
+  id             String           @id @default(cuid())
   name           String?
-  email          String?   @unique
+  email          String?          @unique
   emailVerified  DateTime?
   image          String?
-  role           UserRole  @default(USER)
-  accounts       Account[]
-  sessions       Session[]
-  receipts       Receipt[]
+  role           UserRole         @default(USER)
   state          String?
   hospital       String?
-}
+  address        String?
+  dateOfBirth    DateTime?
+  gender         String?
+  phone          String?
+  city           String?
+  pincode        String?
+  accounts       Account[]
+  sessions       Session[]
+  appointments   Appointment[]
+  receipts       Receipt[]
+  emergencyAlerts EmergencyAlert[] @relation("PatientAlerts")
+  medicineReminders MedicineReminder[]
 
-enum UserRole {
-  USER
-  ADMIN
-  HOSPITAL
+  @@index([role, hospital])
+  @@index([email])
+  @@index([state])
+  @@index([email, role])
+  @@index([hospital, role])
 }
 
 model VerificationToken {
@@ -72,21 +79,140 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-// Medical receipt and queue models
 model Receipt {
+  id            String        @id @default(cuid())
+  userId        String
+  imageUrl      String
+  uploatedAt    DateTime      @default(now())
+  processedAt   DateTime?
+  condition     String?
+  severity      Int?          @default(0)
+  hospitalId    String?
+  status        ReceiptStatus @default(PENDING)
+  queuePosition Int?
+  aiAnalysis    String?
+  doctorId      String?
+  updatedAt     DateTime      @updatedAt
+  doctor        Doctor?       @relation(fields: [doctorId], references: [id])
+  hospital      Hospital?     @relation(fields: [hospitalId], references: [id])
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([hospitalId])
+  @@index([doctorId])
+  @@index([status])
+}
+
+model Hospital {
+  id             String           @id @default(cuid())
+  name           String
+  state          String
+  city           String?
+  address        String?
+  doctors        Doctor[]
+  receipts       Receipt[]
+  appointments   Appointment[]
+  emergencyAlerts EmergencyAlert[] @relation("HospitalAlerts")
+
+  @@index([state, city])
+  @@index([name])
+  @@index([state])
+}
+
+model State {
+  id   String @id @default(cuid())
+  name String @unique
+}
+
+model Doctor {
+  id           String        @id @default(cuid())
+  name         String
+  specialty    String
+  hospitalId   String
+  available    Boolean       @default(true)
+  hospital     Hospital      @relation(fields: [hospitalId], references: [id])
+  patients     Receipt[]
+  appointments Appointment[]
+
+  @@index([hospitalId])
+  @@index([specialty])
+  @@index([available])
+}
+
+// Appointment model for scheduling
+model Appointment {
+  id              String            @id @default(cuid())
+  userId          String
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  hospitalId      String
+  hospital        Hospital          @relation(fields: [hospitalId], references: [id])
+  doctorId        String?
+  doctor          Doctor?           @relation(fields: [doctorId], references: [id])
+  symptoms        String            @db.Text
+  aiAnalysis      String?           @db.Text
+  severity        Int?              @default(0) // Higher number means more severe
+  status          AppointmentStatus @default(PENDING)
+  preferredDate   DateTime
+  scheduledDate   DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([userId])
+  @@index([hospitalId])
+  @@index([doctorId])
+  @@index([status])
+  @@index([preferredDate])
+}
+
+// Emergency Alert model for urgent patient situations
+model EmergencyAlert {
+  id             String               @id @default(cuid())
+  userId         String
+  user           User                 @relation("PatientAlerts", fields: [userId], references: [id])
+  hospitalId     String
+  hospital       Hospital             @relation("HospitalAlerts", fields: [hospitalId], references: [id])
+  status         EmergencyAlertStatus @default(PENDING)
+  patientInfo    Json                 // Stores patient contact and location details
+  medicalHistory Json                 // Stores recent medical reports and conditions
+  createdAt      DateTime             @default(now())
+  respondedAt    DateTime?
+  notes          String?              @db.Text
+
+  @@index([userId])
+  @@index([hospitalId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// Medicine Reminder model for tracking medication schedules
+model MedicineReminder {
   id          String   @id @default(cuid())
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  imageUrl    String
-  uploatedAt  DateTime @default(now())
-  processedAt DateTime?
-  condition   String?
-  severity    Int?     @default(0) // Higher number means more severe
-  hospitalId  String?
-  hospital    Hospital? @relation(fields: [hospitalId], references: [id])
-  status      ReceiptStatus @default(PENDING)
-  queuePosition Int?
-  aiAnalysis  String?  @db.Text
+  name        String
+  dosage      String
+  frequency   String
+  time        String
+  notes       String?  @db.Text
+  createdAt   DateTime @default(now())
+  isActive    Boolean  @default(true)
+  aiGenerated Boolean  @default(false)
+
+  @@index([userId])
+  @@index([isActive])
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+enum UserRole {
+  USER
+  ADMIN
+  HOSPITAL
 }
 
 enum ReceiptStatus {
@@ -96,16 +222,9 @@ enum ReceiptStatus {
   COMPLETED
 }
 
-model Hospital {
-  id          String   @id @default(cuid())
-  name        String
-  state       String
-  city        String?
-  address     String?
-  receipts    Receipt[]
-}
-
-model State {
-  id          String   @id @default(cuid())
-  name        String   @unique
+enum EmergencyAlertStatus {
+  PENDING
+  ACKNOWLEDGED
+  RESPONDED
+  CLOSED
 }

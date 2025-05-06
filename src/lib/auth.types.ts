@@ -7,6 +7,10 @@ declare module "next-auth" {
     role: UserRole;
     state?: string | null;
     hospital?: string | null;
+    dateOfBirth?: string | Date | null;
+    gender?: string | null;
+    phone?: string | null;
+    address?: string | null;
   }
 
   interface Session {
@@ -20,5 +24,9 @@ declare module "next-auth/jwt" {
     role: UserRole;
     state?: string | null;
     hospital?: string | null;
+    dateOfBirth?: string | Date | null;
+    gender?: string | null;
+    phone?: string | null;
+    address?: string | null;
   }
 } 

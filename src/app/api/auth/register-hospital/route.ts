@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 
+// Common medical specialties to create doctors for - reduced to minimize DB operations
+const COMMON_SPECIALTIES = [
+  "General Medicine",
+  "Cardiology", 
+  "Pediatrics",
+  "Emergency Medicine"
+];
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -15,9 +23,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check if user with email already exists
+    // Check if user with email already exists - simple query
     const existingUser = await prisma.user.findUnique({
       where: { email },
+      select: { id: true } // Only select the ID for faster query
     });
 
     if (existingUser) {
@@ -30,61 +39,80 @@ export async function POST(req: NextRequest) {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create transaction to create user, account, and hospital
-    const result = await prisma.$transaction(async (tx) => {
-      // 1. Create user with HOSPITAL role
-      const user = await tx.user.create({
-        data: {
-          name,
-          email,
-          role: "HOSPITAL",
-          state: state,
-          hospital: hospitalName,
-        },
+    try {
+      // Use a transaction to ensure data consistency and improve performance
+      return await prisma.$transaction(async (tx) => {
+        // Create hospital
+        const hospital = await tx.hospital.create({
+          data: {
+            name: hospitalName,
+            address: `${address}, ${pincode}`,
+            state,
+            city,
+          },
+        });
+        
+        // Create user and account in a single transaction
+        const user = await tx.user.create({
+          data: {
+            name,
+            email,
+            role: "HOSPITAL",
+            state: state,
+            hospital: hospital.id,
+            // Create account inline with user for faster creation
+            accounts: {
+              create: {
+                type: "credentials",
+                provider: "credentials",
+                providerAccountId: email,
+                refresh_token: hashedPassword,
+              }
+            }
+          },
+          // Only include necessary fields in the response
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true
+          }
+        });
+
+        // Batch create doctors in a single operation
+        const doctorsData = COMMON_SPECIALTIES.map(specialty => ({
+          name: `Dr. ${generateDoctorName()} (${specialty})`,
+          specialty,
+          hospitalId: hospital.id,
+          available: true
+        }));
+        
+        await tx.doctor.createMany({
+          data: doctorsData
+        });
+
+        return NextResponse.json({
+          message: "Hospital registered successfully",
+          user,
+          hospital: {
+            id: hospital.id,
+            name: hospital.name
+          },
+          doctorsCount: COMMON_SPECIALTIES.length
+        });
+      }, {
+        timeout: 10000 // 10 second timeout for the transaction
       });
-
-      // 2. Create account with the hashed password
-      await tx.account.create({
-        data: {
-          userId: user.id,
-          type: "credentials",
-          provider: "credentials",
-          providerAccountId: email,
-          refresh_token: hashedPassword, // Store password here
-          access_token: null,
-          expires_at: null,
-          token_type: null,
-          scope: null,
-          id_token: null,
-          session_state: null,
+    } catch (dbError) {
+      console.error("Database operation failed:", dbError);
+      return NextResponse.json(
+        { 
+          message: "Failed to create hospital account in database",
+          error: dbError instanceof Error ? dbError.message : String(dbError),
         },
-      });
-
-      // 3. Create hospital entry
-      const hospital = await tx.hospital.create({
-        data: {
-          name: hospitalName,
-          address: `${address}, ${pincode}`, // Include pincode in address
-          state,
-          city,
-        },
-      });
-
-      return { user, hospital };
-    });
-
-    const { user, hospital } = result;
-
-    return NextResponse.json({
-      message: "Hospital registered successfully",
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role
-      },
-      hospital,
-    });
+        { status: 500 }
+      );
+    }
   } catch (error) {
     console.error("Hospital registration error:", error);
     return NextResponse.json(
@@ -95,4 +123,15 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
-} 
+}
+
+// Helper function to generate random doctor names
+function generateDoctorName() {
+  const firstNames = ["James", "John", "Robert", "Michael", "Sarah", "Karen", "Lisa", "Mary"];
+  const lastNames = ["Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis"];
+  
+  const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
+  const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
+  
+  return `${firstName} ${lastName}`;
+}

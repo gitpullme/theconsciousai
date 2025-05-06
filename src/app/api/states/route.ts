@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { getStates, initializeStates } from "@/services/hospital";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/route";
+import { INDIAN_STATES } from "@/lib/constants";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -11,12 +11,8 @@ export async function GET() {
   }
 
   try {
-    // Make sure states are initialized
-    await initializeStates();
-    
-    // Get all states
-    const states = await getStates();
-    return NextResponse.json(states);
+    // Return static states data instead of querying the database
+    return NextResponse.json(INDIAN_STATES);
   } catch (error) {
     console.error("Error fetching states:", error);
     return NextResponse.json(

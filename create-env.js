@@ -1,8 +1,8 @@
 const fs = require('fs');
 
-const envContent = `# Direct database connection
-DATABASE_URL="postgresql://neondb_owner:npg_pdjTalF2WM8A@ep-royal-math-a5j7gwws.us-east-2.aws.neon.tech/neondb?sslmode=require"
-DIRECT_URL="postgresql://neondb_owner:npg_pdjTalF2WM8A@ep-royal-math-a5j7gwws.us-east-2.aws.neon.tech/neondb?sslmode=require"
+const envContent = `# Database configuration - Supabase
+DATABASE_URL="postgresql://postgres.fqnkpvsmezumndmyncmi:dikshant%2395@aws-0-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true"
+DIRECT_URL="postgresql://postgres.fqnkpvsmezumndmyncmi:dikshant%2395@aws-0-us-east-2.pooler.supabase.com:5432/postgres"
 
 # Google OAuth
 GOOGLE_CLIENT_ID=""
@@ -19,11 +19,10 @@ fs.writeFileSync('.env', envContent);
 
 console.log('.env file created successfully');
 
-// Create a .env.development.local file with the same direct connection
-// Make sure NOT to use Prisma Accelerate URLs since they're causing issues
-const devEnvContent = `# Direct database connection - no Accelerate to avoid issues
-DATABASE_URL="postgresql://neondb_owner:npg_pdjTalF2WM8A@ep-royal-math-a5j7gwws.us-east-2.aws.neon.tech/neondb?sslmode=require"
-DIRECT_URL="postgresql://neondb_owner:npg_pdjTalF2WM8A@ep-royal-math-a5j7gwws.us-east-2.aws.neon.tech/neondb?sslmode=require"`;
+// Create a .env.development.local file with the same connection
+const devEnvContent = `# Database configuration - Supabase
+DATABASE_URL="postgresql://postgres.fqnkpvsmezumndmyncmi:dikshant%2395@aws-0-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true"
+DIRECT_URL="postgresql://postgres.fqnkpvsmezumndmyncmi:dikshant%2395@aws-0-us-east-2.pooler.supabase.com:5432/postgres"`;
 
 fs.writeFileSync('.env.development.local', devEnvContent);
 
